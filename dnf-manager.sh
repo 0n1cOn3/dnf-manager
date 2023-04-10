@@ -21,32 +21,57 @@ export_pkgs() {
     dnf repoquery --installed | sort | grep -oP "(^.+)(?=-[\d]+:.+)" | uniq -i >"$1" && echo "Package list successfully exported to $1."
 }
 
-import_pkgs() {
-    if ! [ -f "$1" ] || ! [ -r "$1" ] || ! [ -s "$1" ]; then
-        echo "File does not exist, is not readable, or is empty." && exit 1
+import_and_check_pkgs() {
+    if [ -f "$1" ] && [ -r "$1" ] && [ -s "$1" ]; then
+        local actual
+        actual=$(uuidgen)
+
+        dnf repoquery --installed | sort | grep -oP "(^.+)(?=-[\d]+:.+)" | uniq -i >"$actual"
+
+        local to_install=()
+        local to_remove=()
+        while read -r pkg; do
+            if ! grep -q "^$pkg$" "$actual"; then
+                echo "Package $pkg is not installed."
+                read -r -p "Do you want to install it? [Y/n] " answer
+                case "$answer" in
+                    [yY]|[yY][eE][sS]) to_install+=("$pkg") ;;
+                    [nN]|[nN][oO]) to_remove+=("$pkg") ;;
+                    *) to_install+=("$pkg") ;;
+                esac
+            fi
+        done <"$1"
+
+        if [ "${#to_remove[@]}" -gt 0 ]; then
+            echo "The following packages are installed on the system but not present in the list:"
+            printf '%s\n' "${to_remove[@]}"
+            read -r -p "Do you want to remove them? [Y/n] " answer
+            if [[ "$answer" =~ ^[yY]|[yY][eE][sS]$ ]]; then
+                for pkg in "${to_remove[@]}"; do
+                    dnf remove -y "$pkg"
+                done
+            fi
+        fi
+
+        if [ "${#to_install[@]}" -gt 0 ]; then
+            echo "The following packages are not installed on the system:"
+            printf '%s\n' "${to_install[@]}"
+            read -r -p "Do you want to install them? [Y/n] " answer
+            if [[ "$answer" =~ ^[yY]|[yY][eE][sS]$ ]]; then
+                for pkg in "${to_install[@]}"; do
+                    dnf --setopt=install_weak_deps=False install -y "$pkg"
+                done
+            fi
+        else
+            echo "The system is already in sync with the list."
+        fi
+
+        rm "$actual"
+    else
+        echo "File not exists, not readable or is empty." && exit 1
     fi
-
-    local actual
-    actual=$(uuidgen)
-
-    export_pkgs "$actual"
-
-    local to_delete
-    to_delete=$(comm -23 <(sort "$actual") <(sort "$1"))
-
-    for pkg in $to_delete; do
-        dnf remove -y "$pkg"
-    done
-
-    rm "$actual"
-
-    local to_install
-    to_install=$(comm -13 <(sort "$actual") <(sort "$1"))
-
-    for pkg in $to_install; do
-        dnf --setopt=install_weak_deps=False install -y "$pkg"
-    done
 }
+
 
 if [ $EUID -ne 0 ]; then
     echo "Root privileges required." && exit 1
@@ -68,7 +93,7 @@ elif [ "$operation" = "export" ]; then
     fi
     export_pkgs "$path"
 elif [ "$operation" = "import" ]; then
-    import_pkgs "$path"
+    import_and_check_pkgs "$path"
 else
     echo "Invalid operation." && get_help && exit 1
 fi
