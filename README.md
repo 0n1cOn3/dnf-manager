@@ -1,23 +1,43 @@
 # dnf-manager
+This is a Bash script for managing packages in a Fedora-based Linux distribution. It can export a list of currently installed packages to a file, and import a list of packages from a file to install them on the system.
 
-A script created to ease a process of moving to a new system by restoring
-a set of predefined DNF packages.
+## Usage
 
-Uses package names and ignores versions during operations.
-Can use any text file with package names list for import operation.
+`sudo ./pkg_manage.sh [-o <export|import>] [-p <file_path>]` 
 
-**Requires root privileges to run.**
+### Options
 
-## Use
+-   `-o`: Specifies the operation to perform. Can either be `export` or `import`.
+-   `-p`: Specifies the file path. For `export`, the file should not exist, and for `import`, the file should exist and be readable.
 
-    $ sudo ./dnf-manager.sh
-    Usage: sudo ./dnf-manager.sh [-o <export|import>] [-p <arg...>]
+### Examples
 
-    -o  Operation to perform, can either be export or import:
-            export - Exports names of installed packages (without version and architecture) to a plain text file.
-            import - Imports package names from plain text file and installs the same set of packages removing the ones not in the list.
+Export a list of installed packages to a file:
 
-    -p  Relative filepath, file shouldn't exist for export operation and should exist, be readable and not empty for import operation.
+`sudo ./pkg_manage.sh -o export -p pkg_list.txt` 
+
+Import a list of packages from a file:
+
+`sudo ./pkg_manage.sh -o import -p pkg_list.txt` 
+
+## Functions
+
+### export_pkgs
+
+Exports names of installed packages (without version and architecture) to a plain text file.
+
+### import_pkgs
+
+Imports package names from plain text file and installs the same set of packages removing the ones not in the list.
+
+### check_pkgs
+
+Compares the package list from import_pkgs against the list of installed packages and shows the differences. Asks the user if they want to install the missing packages.
+
+## Contributing
+
+Feel free to submit pull requests or issues if you find any bugs or have any suggestions for improvement.
+
 
 ## Copyright Disclaimer 
 Original source code has been brought by [Molnix888](https://github.com/Molnix888/dnf-export-import-pkgs)
